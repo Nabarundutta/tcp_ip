@@ -1,64 +1,71 @@
 #include <stdio.h>
 #include <stdlib.h>
-#include <arpa/inet.h>
 #include <string.h>
 #include <unistd.h>
+#include <arpa/inet.h>
 
-int main(){
+int main() {
     char *ip = "127.0.0.1";
-    int port = 5565;
+    int port = 6000;
 
-    // make the veraibles
-    int server_sock,client_sock;
-    struct sockaddr_in server_addr,client_addr;
+    int server_sock, client_sock;
+    struct sockaddr_in server_addr, client_addr;
     socklen_t addr_size;
     char buffer[1024];
-    int n ;
+    int n;
 
-    // create the tcp socket
-    server_sock = socket(AF_INET,SOCK_STREAM,0);
-    if(server_sock<0){
-        perror("[-] Socket error");
+    // 1. Create TCP socket
+    server_sock = socket(AF_INET, SOCK_STREAM, 0);
+    if (server_sock < 0) {
+        perror("[-]Socket error");
         exit(1);
     }
-    printf("[-] TCP server socket created");
+    printf("[+]TCP server socket created.\n");
 
-    // Configure server address
-    memset(&server_addr,'\0',sizeof(server_addr));
-    server_addr.sin_family=AF_INET;
-    server_addr.sin_port = port;
+    // 2. Bind address to socket
+    memset(&server_addr, '\0', sizeof(server_addr));
+    server_addr.sin_family = AF_INET;
+    server_addr.sin_port = port;  // convert port to network byte order
     server_addr.sin_addr.s_addr = inet_addr(ip);
 
-    // Bind the socket to the port 
-    n = bind(server_sock,(struct sockaddr*)&server_addr,sizeof(server_addr));
-    if (n<0){
+    n = bind(server_sock, (struct sockaddr*)&server_addr, sizeof(server_addr));
+    if (n < 0) {
         perror("[-]Bind error");
         exit(1);
     }
-    printf("[+] Bind successfull at port : %d",port);
+    printf("[+]Bind to the port number %d\n", port);
 
+    // 3. Listen
+    listen(server_sock, 5);
+    printf("Listening ...\n");
 
-    listen(server_sock,5);
-    printf("Server is listening: ");
-    while(1){
+    // 4. Accept loop
+    while (1) {
         addr_size = sizeof(client_addr);
-        client_sock = accept(server_sock,(struct sockaddr*)&client_addr,&addr_size);
-        printf("[+] Client connected.\n");
-        bzero(buffer, 1024);  // Clear buffer
-        recv(client_sock, buffer, sizeof(buffer), 0);  // Wait for client message
-        printf("Client: %s\n", buffer);
+        client_sock = accept(server_sock, (struct sockaddr*)&client_addr, &addr_size);
+        if (client_sock < 0) {
+            perror("[-]Accept error");
+            continue;
+        }
 
-        bzero(buffer, 1024);  // Clear buffer again
-        strcpy(buffer, "hello this server have a nice day");  // Server response
-        printf("Server: %s\n", buffer);
-        send(client_sock, buffer, sizeof(buffer), 0);  // Send response
+        printf("[+]Client connected from %s:%d\n",
+               inet_ntoa(client_addr.sin_addr), ntohs(client_addr.sin_port));
+
+        // 5. Receive data
+        bzero(buffer, 1024);
+        recv(client_sock, buffer, sizeof(buffer), 0);
+        printf("Client says: %s\n", buffer);
+
+        // 6. Send response
+        bzero(buffer, 1024);
+        strcpy(buffer, "Hi, this is server. Have a nice day!");
+        send(client_sock, buffer, strlen(buffer), 0);
+
+        // 7. Close client socket
+        close(client_sock);
+        printf("[-]Client disconnected.\n");
     }
-    close(client_sock);
-    printf("[+] Client disconnected\n\n");
 
-
-
-
-
+    close(server_sock);
     return 0;
 }
